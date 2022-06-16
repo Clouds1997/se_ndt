@@ -20,8 +20,9 @@
 using namespace std;
 using namespace perception_oru;
 
-
-NDTMatch_SE::NDTMatch_SE(initializer_list<float> b,initializer_list<int> c,initializer_list<float> d,int nIn,int max_iter):resolutions(b),resolutions_order(c),size(d),NumInputs(nIn)
+//  ({4,0.8},{0,1},{80,80},12,50);
+NDTMatch_SE::NDTMatch_SE(initializer_list<float> b,initializer_list<int> c,initializer_list<float> d,int nIn,int max_iter):
+    resolutions(b),resolutions_order(c),size(d),NumInputs(nIn)
 {
     matcher.NumInputs=NumInputs;
     matcher.ITR_MAX =max_iter;
@@ -173,15 +174,23 @@ void print_pose(ostream& os, Eigen::Affine3d& T){
 }
 
 //这里是点云送进来处理的地方
+// 到底在哪里求解呀 T_T
 void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
 {
     ofstream pose_out("LC1.txt",std::ofstream::out|std::ofstream::app);
     // 将点云按照语义分别存储 这里的NumInpus设定是12, 代表一次读取了12个点云?
+    //这里出来后用laserCloud[label]取出对应label中的所有点
 	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr >laserCloud=getSegmentsFast(cloud,NumInputs);
     
+    //加载点云，计算体素协方差
+    //这里分辨率是{4，0.8}
+    // 出来以后具有points和ndtcell
 	for(unsigned int i=0;i<resolutions.size();i++)
 		loadMap(mapLocal[i],laserCloud);
+
     Eigen::Matrix<double,7,7> C;
+
+    //刚进来的时候num_clouds是 == 0 的, 也就是第一个点云
 	if(num_clouds>0)
 	{
         Eigen::Affine3d tmpT=T*Td;
@@ -199,12 +208,15 @@ void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
         pose_out<<num_clouds-1<<" "<<num_clouds<<" ";print_pose(pose_out,Td);
 	}
 	else{
+        //将原点加载进去
         pose_graph.addPose(Eigen::Affine3d::Identity(),num_clouds);
     }
 
     std::vector<thread> tc;
     {
         Eigen::Affine3d T_=T;
+        // laser_cloud.size 相当于是label的数量
+        // tc是一个线程列表
         for(size_t i=0;i<laserCloud.size();i++)
             tc.push_back( std::thread([i,&T_, laserCloud](){
                         perception_oru::transformPointCloudInPlace(T_, *laserCloud[i]); }));
@@ -212,9 +224,11 @@ void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
     }
     #pragma omp parallel num_threads(N_THREADS)
     {
+        // 类别
         #pragma omp for
         for(size_t i=0;i<laserCloud.size();i++)
         {
+            // 分辨率
             for(int rez=0;rez<resolutions.size();rez++)
             {
                 map_[rez][i]->addPointCloud(T.translation(), *laserCloud[i],0.06, 100, 0.03, 255);
@@ -225,10 +239,15 @@ void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
 
     perception_oru::NDTHistogram *hist = new perception_oru::NDTHistogram (mapLocal[1], 1, HIST_BINS1, HIST_BINS2, NumInputs,RANGE1, RANGE2);
     if(num_clouds==0){
+        // 如果是第一帧
         key_hists[num_clouds]=hist;
         num_clouds++;
         return;
     }
+
+    // 如果是后面的点云
+
+
     float search_distance=HIST_ACCURATE_DISTANCE+(num_clouds -last_loop_close_id)*0.10;
 
     std::vector<int> poseIdxSearch;
@@ -238,6 +257,7 @@ void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
         std::map<int, Eigen::Affine3d,std::less<int>,
             Eigen::aligned_allocator<std::pair<const int, Eigen::Affine3d> > > hist_rotations;
         std::map<int, float> scores;
+        //找到匹配的NDT块
         #pragma omp parallel num_threads(N_THREADS)
         {
             #pragma omp for

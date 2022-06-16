@@ -164,6 +164,8 @@ void NDTMatcherP2D::generateScoreDebug(const char* out, pcl::PointCloud<pcl::Poi
 
 }
 
+
+// 终于到这里了 T_T
 bool NDTMatcherP2D::match( pcl::PointCloud<pcl::PointXYZ>& target,
         pcl::PointCloud<pcl::PointXYZ>& source,
         Eigen::Transform<double,3,Eigen::Affine,Eigen::ColMajor>& T )
@@ -247,6 +249,7 @@ bool NDTMatcherP2D::covariance( pcl::PointCloud<pcl::PointXYZ>& target,
     return true;
 }
 
+// 好像应该是先来这边
 bool NDTMatcherP2D::match( NDTMap& targetNDT,
         pcl::PointCloud<pcl::PointXYZ>& source,
         Eigen::Transform<double,3,Eigen::Affine,Eigen::ColMajor>& T )
@@ -298,6 +301,7 @@ bool NDTMatcherP2D::match( NDTMap& targetNDT,
     double scoreP = 0;
     double score_best = INT_MAX;
     
+    // 判断是否达到收敛
     while(!convergence)
     {
 
@@ -307,37 +311,39 @@ bool NDTMatcherP2D::match( NDTMap& targetNDT,
 
         TR.setIdentity();
         derivativesPointCloud(prevCloud,targetNDT,TR,score_gradient,Hessian,true);
-	scg = score_gradient;
+	    scg = score_gradient;
 
-	Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double,6,6> > Sol (Hessian);
+	    Eigen::SelfAdjointEigenSolver<Eigen::Matrix<double,6,6> > Sol (Hessian);
         Eigen::Matrix<double,6,1> evals = Sol.eigenvalues().real();
+
+        // 这个可以计算出特征值矩阵中的最大和最小值
         double minCoeff = evals.minCoeff();
         double maxCoeff = evals.maxCoeff();
-	if(minCoeff < 0)  //|| evals.minCoeff()) // < 10e-5*evals.maxCoeff()) 
-	{
-	//    std::cerr<<"Hessian near singular "<<evals.transpose()<<std::endl;
-	    Eigen::Matrix<double,6,6> evecs = Sol.eigenvectors().real();
-	    double regularizer = score_gradient.norm();
-	    regularizer = regularizer + minCoeff > 0 ? regularizer : 0.001*maxCoeff - minCoeff;
-	    //double regularizer = 0.001*maxCoeff - minCoeff;
-	    Eigen::Matrix<double,6,1> reg;
-	    //ugly
-	    reg<<regularizer,regularizer,regularizer,regularizer,regularizer,regularizer;
-	    evals += reg;
-	    Eigen::Matrix<double,6,6> Lam;
-	    Lam = evals.asDiagonal();
-	    Hessian = evecs*Lam*(evecs.transpose());
-	}
+        if(minCoeff < 0)  //|| evals.minCoeff()) // < 10e-5*evals.maxCoeff()) 
+        {
+        //    std::cerr<<"Hessian near singular "<<evals.transpose()<<std::endl;
+            Eigen::Matrix<double,6,6> evecs = Sol.eigenvectors().real();
+            double regularizer = score_gradient.norm();
+            regularizer = regularizer + minCoeff > 0 ? regularizer : 0.001*maxCoeff - minCoeff;
+            //double regularizer = 0.001*maxCoeff - minCoeff;
+            Eigen::Matrix<double,6,1> reg;
+            //ugly
+            reg<<regularizer,regularizer,regularizer,regularizer,regularizer,regularizer;
+            evals += reg;
+            Eigen::Matrix<double,6,6> Lam;
+            Lam = evals.asDiagonal();
+            Hessian = evecs*Lam*(evecs.transpose());
+        }
         
-	pose_increment_v = Hessian.ldlt().solve(-score_gradient);
+        pose_increment_v = Hessian.ldlt().solve(-score_gradient);
 
         score = scorePointCloud(prevCloud,targetNDT);
-	if(score < score_best) 
-	{
-	    Tbest = T;
-	    score_best = score;
-	}
-	//std::cerr<<"iteration "<<itr_ctr<<" pose norm "<<(pose_increment_v.norm())<<" score "<<score<<std::endl;
+        if(score < score_best) 
+        {
+            Tbest = T;
+            score_best = score;
+        }
+        //std::cerr<<"iteration "<<itr_ctr<<" pose norm "<<(pose_increment_v.norm())<<" score "<<score<<std::endl;
         
 
 //step control...

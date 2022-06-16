@@ -117,6 +117,7 @@ std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getSegmentsFast(pcl::PointCloud
 	{
             auto pnt=laserCloudIn->points[i];
             int atr = round(pnt.intensity);
+			//这里如果是1就代表只有一个分类
             if(NumInputs==1)
                 atr=0;
             pcl::PointXYZ point;
