@@ -103,6 +103,7 @@ Eigen::Matrix<double,7,6> getJacobian(Eigen::VectorXd v)
 	return m;
 }
 
+// 按照强度将点云分别存储
 std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr> getSegmentsFast(pcl::PointCloud<pcl::PointXYZI>::Ptr laserCloudIn, int NumInputs)
 {
 	int cloudSize = laserCloudIn->points.size();

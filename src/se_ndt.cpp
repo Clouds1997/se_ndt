@@ -171,10 +171,14 @@ void print_pose(ostream& os, Eigen::Affine3d& T){
     os<<T.translation().transpose()<<" ";
     os<<Eigen::Quaterniond(T.rotation()).coeffs().transpose()<<std::endl;
 }
+
+//这里是点云送进来处理的地方
 void NDTMatch_SE::slam(pcl::PointCloud<pcl::PointXYZI>::Ptr cloud)
 {
     ofstream pose_out("LC1.txt",std::ofstream::out|std::ofstream::app);
+    // 将点云按照语义分别存储 这里的NumInpus设定是12, 代表一次读取了12个点云?
 	std::vector<pcl::PointCloud<pcl::PointXYZ>::Ptr >laserCloud=getSegmentsFast(cloud,NumInputs);
+    
 	for(unsigned int i=0;i<resolutions.size();i++)
 		loadMap(mapLocal[i],laserCloud);
     Eigen::Matrix<double,7,7> C;
