@@ -8,6 +8,8 @@
 #include <ctime>
 #include <boost/filesystem.hpp>
 #define PI 3.14159265
+
+// 设置标签
 std::map<int,int> get_label_map(){
     std::map<int,int> lm;
     lm[0 ]= 0;     // "unlabeled"
@@ -100,6 +102,8 @@ int main(int argc, char** argv)
         std::cout<<desc;
 		return 0;
 	}
+
+    // 读取文件列表
 	vector<string> pointcloud_files;
 	pointcloud_files= vm["pointclouds"].as<vector<string> >();
 	vector<string> label_files;
